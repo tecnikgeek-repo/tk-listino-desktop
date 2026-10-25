@@ -1,0 +1,43 @@
+tk-listino - listini con foto, sezioni e prezzi, in PDF o stampati
+=================================================================
+
+COME SI USA
+1. Estrai questa cartella dove vuoi (anche direttamente sulla pennetta USB).
+2. Doppio clic su "Avvia tk-listino.cmd" (la prima volta). Al primo avvio compare nella cartella
+   l'icona "tk-listino": da lì in poi usa quella. Se sposti la cartella, riavvia dal .cmd e l'icona si rifà.
+3. Nessuna installazione: puoi portare la cartella su qualsiasi PC Windows.
+
+I LISTINI
+- Si salvano nella cartella "Listini", accanto a "app": se copi tutta la cartella su un altro
+  PC o pennetta, ti porti dietro anche i tuoi listini.
+- A ogni salvataggio la versione precedente resta in "<nome>.listino.bak"; ogni 5 minuti le modifiche non
+  salvate vanno in una copia di recupero ("<nome>.listino.recupero"), proposta al riavvio se il programma
+  si era chiuso all'improvviso.
+- Gli aggiornamenti automatici sostituiscono solo la cartella "app": "Listini" non viene toccata.
+  Se un aggiornamento si interrompe (pennetta tolta, PC spento), "Avvia tk-listino.cmd" rimette a posto
+  la cartella "app" al successivo avvio.
+
+COSA RESTA SUL COMPUTER E COSA VA IN RETE
+- Listini, foto e PDF importati restano sul computer (o sulla pennetta). Il testo delle foto si legge con il
+  riconoscimento del testo di Windows, senza mandarle a nessuno.
+- In rete va solo il controllo degli aggiornamenti (da pietrodefilippis.it) e, se lo permetti al primo avvio
+  o nelle Impostazioni, un segnale anonimo al giorno per le statistiche (nome, versione e sistema, con un
+  codice casuale).
+- Anche la versione portatile scrive nel registro di Windows (solo per il tuo utente, senza permessi di
+  amministratore) l'associazione dei file ".listino", così il doppio clic su un listino apre tk-listino:
+  chiavi HKCU\Software\Classes\.listino, HKCU\Software\Classes\TKLISTINO.Listino,
+  HKCU\Software\TecnikGeek\tk-listino e la voce "tk-listino" in HKCU\Software\RegisteredApplications.
+  Il programma ricorda il benvenuto e il consenso alle statistiche in %APPDATA%\tk-listino.
+
+SE WINDOWS BLOCCA L'AVVIO
+Tasto destro sul file ZIP scaricato -> Proprieta' -> spunta "Sblocca" -> OK, poi estrai di nuovo.
+
+LICENZA
+tk-listino è software libero e gratuito, con tutte le funzioni, sotto licenza GNU AGPL-3.0 (o successiva):
+puoi usarlo, studiarlo, modificarlo e condividerlo. È fornito così com'è, senza alcuna garanzia.
+Codice sorgente: https://github.com/tecnikgeek-repo/tk-listino-desktop
+Testi delle licenze e componenti inclusi: cartella "app\licenze" (anche da Impostazioni -> Licenze e codice sorgente).
+Il nome tk-listino e il logo non sono coperti dalla licenza: una versione modificata deve avere un nome diverso.
+Se ti è utile puoi offrirmi un caffè: https://pietrodefilippis.it/donazione/
+
+Sviluppato da Pietro De Filippis (TecnikGeek) - https://pietrodefilippis.it

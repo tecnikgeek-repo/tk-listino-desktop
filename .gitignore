@@ -1,0 +1,15 @@
+.venv*/
+build/
+dist/
+__pycache__/
+*.pyc
+Listini/
+assets/*.iconset/
+assets/*.icns
+tests/*.png
+!tests/prova.png
+tests/*.txt
+tests/*.pdf
+!tests/prova.pdf
+tests/foto.jpg
+licenze-pacchetto/

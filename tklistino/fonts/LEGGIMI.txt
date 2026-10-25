@@ -1,0 +1,5 @@
+Font da Google Fonts (fonts.google.com), inclusi nel programma per funzionare anche senza internet
+e uscire uguali nel PDF. Licenza SIL Open Font License 1.1 (Roboto: Apache License 2.0):
+si possono usare, incorporare nei documenti e ridistribuire liberamente.
+
+Roboto, Open Sans, Lato, Montserrat, Poppins, Oswald, Raleway, Nunito, Playfair Display, Merriweather.

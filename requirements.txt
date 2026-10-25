@@ -1,0 +1,7 @@
+# Dipendenze di tk-listino (sviluppo e build Windows: .venv nella radice del repo)
+#   uv venv --python 3.13 .venv
+#   uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+# (oppure: python -m venv .venv  e  .venv\Scripts\pip install -r requirements.txt)
+pyside6-essentials==6.11.2   # LGPL-3.0
+certifi                      # MPL-2.0
+pypdfium2==5.14.0            # Apache-2.0 / BSD-3-Clause: lettura dei PDF da importare
