@@ -1411,7 +1411,8 @@ class MainWindow(QMainWindow):
         split.setStretchFactor(0, 5)
         split.setStretchFactor(1, 5)
         self.setCentralWidget(central)
-        self.setStyleSheet(STYLE)
+        from tklistino.tk_licenza_qt import stile_caselle_globale
+        self.setStyleSheet(STYLE + stile_caselle_globale())   # caselle ben visibili, uguali in tutti i software TK
 
     def btn_text_on(self):
         return str(self.settings.value("btn_text", False)).lower() in ("true", "1")
@@ -2381,6 +2382,8 @@ def main():
         sys.exit(cli_update_test(argv))
     app = QApplication(sys.argv)
     load_fonts()
+    from tklistino.tk_licenza_qt import stile_caselle_globale
+    app.setStyleSheet(stile_caselle_globale())   # anche nelle finestre senza genitore
     # memoria del programma (benvenuto, consenso alle statistiche, invito al caffè): nessuna rete qui
     app.licenza = pro.crea_licenza(VERSION)
     app.setApplicationName(APP_TITLE)
