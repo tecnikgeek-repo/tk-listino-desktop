@@ -1,6 +1,5 @@
 """Finestra principale di tk-listino: editor a lastre a sinistra, foglio A4 reale a destra."""
 import base64
-import html
 import os
 import sys
 import time
@@ -20,7 +19,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QSpinBox, QSplitter, QStyledItemDelegate, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from tklistino import APP_TITLE, AUTHOR, AUTHOR_URL, URL_SORGENTE, VERSION, model, pro, updater
+from tklistino import APP_TITLE, URL_SORGENTE, VERSION, model, pro, updater
 from tklistino.tk_licenza_qt import dentro_lo_schermo, testata_compatta
 from tklistino.util import (
     APP_ROOT, IS_WIN, Settings, create_desktop_shortcut, data_dir, ensure_folder_shortcut, human_size, is_installed,
@@ -937,87 +936,6 @@ class UpdateDialog(TkDialog):
     def _done(self, value):
         self.choice = value
         self.accept()
-
-
-class AboutDialog(TkDialog):
-    """Stessa finestra Informazioni delle altre app TK: fondo navy, schede VERSIONE / SVILUPPATORE."""
-
-    def __init__(self, win):
-        super().__init__(win, 460)
-        self.check = False
-        lay = self.body
-        head = QLabel("IMPOSTAZIONI", objectName="atitle")
-        lay.addWidget(head)
-        top = QHBoxLayout()
-        icon = QLabel()
-        icon.setPixmap(render_icon(72))
-        top.addWidget(icon)
-        top.addSpacing(10)
-        col = QVBoxLayout()
-        t = QLabel(APP_TITLE)
-        t.setStyleSheet("font-size:24px; font-weight:800; color:#fff;")
-        col.addWidget(t)
-        s = QLabel("Crea listini con foto, sezioni e prezzi,\npronti da stampare o scaricare in PDF.")
-        s.setObjectName("asub")
-        col.addWidget(s)
-        top.addLayout(col, 1)
-        lay.addLayout(top)
-        for title, body in (("VERSIONE", f"{VERSION}  ·  Software libero · AGPL-3.0"),
-                            ("SVILUPPATORE", f"{AUTHOR} · {AUTHOR_URL.split('//')[1]}"),
-                            ("I TUOI LISTINI", html.escape(data_dir()))):
-            card = QFrame(objectName="acard")
-            cl = QVBoxLayout(card)
-            cl.setContentsMargins(16, 12, 16, 12)
-            cl.setSpacing(2)
-            cl.addWidget(QLabel(title, objectName="atitle"))
-            v = QLabel(body)
-            v.setWordWrap(True)
-            v.setStyleSheet("font-size:14px; font-weight:600;")
-            cl.addWidget(v)
-            lay.addWidget(card)
-        self.win = win
-        self.txt_btn = text_btn("type", "", self._toggle_text, "#fff", "ghost",
-                                "Pulsanti in alto: solo icona oppure icona e nome")
-        self._label_text()
-        lay.addWidget(self.txt_btn)
-        stats = pro.casella_statistiche()
-        stats.setStyleSheet("QCheckBox { color:#ffffff; font-size:13px; font-weight:600; spacing:8px; }")
-        lay.addWidget(stats)
-        lay.addWidget(text_btn("refresh", "Cerca aggiornamenti", self._check, "#fff", "accent"))
-        lay.addWidget(text_btn("", "Licenze e codice sorgente", self._licenses, "#fff", "ghost"))
-        caffe = pro.pulsante_caffe("ghost")
-        if caffe is not None:
-            lay.addWidget(caffe)
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        if IS_WIN:
-            row.addWidget(text_btn("sheet", "Icona sul Desktop", self._shortcut, "#fff", "ghost"), 1)
-        row.addWidget(text_btn("", "Chiudi", self.accept, "#fff", "ghost"), 1)
-        lay.addLayout(row)
-
-    def _label_text(self):
-        self.txt_btn.setText("Pulsanti con testo: " + ("SÌ" if self.win.btn_text_on() else "NO"))
-
-    def _toggle_text(self):
-        self.win.settings.setValue("btn_text", not self.win.btn_text_on())
-        self.win.apply_btn_text()
-        self._label_text()
-
-    def _shortcut(self):
-        try:
-            path = create_desktop_shortcut()
-        except Exception as exc:
-            tk_warn(self.parent(), APP_TITLE, f"Non riesco a creare l'icona sul Desktop:\n{exc}")
-            return
-        tk_info(self.parent(), APP_TITLE, f"Icona creata sul Desktop:\n{path}")
-
-    def _check(self):
-        self.check = True
-        self.accept()
-
-    def _licenses(self):
-        from tklistino.tk_licenza_qt import LicenzeDialog
-        LicenzeDialog(APP_TITLE, VERSION, URL_SORGENTE, licenze_dir(), self).exec()
 
 
 class MainWindow(QMainWindow):
@@ -2214,10 +2132,32 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- info e aggiornamenti
     def act_about(self):
-        dlg = AboutDialog(self)
-        dlg.exec()
-        if dlg.check:
-            self.check_updates(True)
+        """Informazioni: finestra comune a tutti i software TK (libreria), colore di tk-listino."""
+        from tklistino.tk_licenza_qt import InformazioniDialog
+
+        def testo_pulsanti():
+            return "Pulsanti in alto con il nome: " + ("SÌ" if self.btn_text_on() else "NO")
+
+        def cambia_pulsanti():
+            self.settings.setValue("btn_text", not self.btn_text_on())
+            self.apply_btn_text()
+            return testo_pulsanti()
+
+        InformazioniDialog(
+            pro.licenza(), APP_TITLE, VERSION, "Crea listini con foto, sezioni e prezzi, pronti da stampare o "
+            "scaricare in PDF.", render_icon(136), "#e11d48",
+            dati=[("I tuoi listini", data_dir())], url_sorgente=URL_SORGENTE, cartella_licenze=licenze_dir(),
+            su_aggiornamenti=lambda: self.check_updates(True),
+            su_icona_desktop=self._icona_desktop if IS_WIN else None,
+            pulsanti=[(testo_pulsanti(), cambia_pulsanti)], parent=self).exec()
+
+    def _icona_desktop(self):
+        try:
+            path = create_desktop_shortcut()
+        except Exception as exc:
+            tk_warn(self, APP_TITLE, f"Non riesco a creare l'icona sul Desktop:\n{exc}")
+            return
+        tk_info(self, APP_TITLE, f"Icona creata sul Desktop:\n{path}")
 
     def show_update_button(self, version):
         self.update_btn.setVisible(bool(version))
