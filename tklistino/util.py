@@ -294,45 +294,18 @@ MIME_XML = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
-def _run_quiet(cmd):
-    import subprocess
-    try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=tk_linux.system_env())
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
 def install_linux_integration():
     """Linux (AppImage): tipo di file .listino con la sua icona (~/.local/share/mime), voce «tk-listino» nel menu
     delle applicazioni e doppio clic sui .listino = tk-listino. Si corregge da sola se l'AppImage è stato spostato.
     Ritorna il percorso del .desktop o "" (non gira dal pacchetto)."""
     if not tk_linux.appimage_path():
         return ""
-    import shutil
-    base = tk_linux.xdg_data_home()
     icon = os.path.join(getattr(sys, "_MEIPASS", APP_ROOT), "assets", "tk-listino-512.png")
-    mime_dir = os.path.join(base, "mime")
-    xml = os.path.join(mime_dir, "packages", "tk-listino.xml")
-    try:
-        with open(xml, encoding="utf-8") as fh:
-            uguale = fh.read() == MIME_XML
-    except OSError:
-        uguale = False
-    if not uguale:
-        os.makedirs(os.path.dirname(xml), exist_ok=True)
-        with open(xml + ".tmp", "w", encoding="utf-8") as fh:
-            fh.write(MIME_XML)
-        os.replace(xml + ".tmp", xml)
-        _run_quiet(["update-mime-database", mime_dir])
-    mime_icons = os.path.join(base, "icons", "hicolor", "512x512", "mimetypes")
-    if os.path.isfile(icon) and not os.path.isfile(os.path.join(mime_icons, "application-x-tk-listino.png")):
-        os.makedirs(mime_icons, exist_ok=True)
-        shutil.copyfile(icon, os.path.join(mime_icons, "application-x-tk-listino.png"))
+    tk_linux.registra_tipo_file("tk-listino", MIME_XML, LINUX_MIME, icon)
     desktop = tk_linux.installa_menu(LINUX_DESKTOP_ID, "tk-listino", "Listini con foto, sezioni e prezzi, in PDF o "
                                      "stampati (TecnikGeek)", "Office;", icon, nome_generico="Listini prezzi",
-                                     parole="listino;prezzi;catalogo;pdf;stampa;", mime=LINUX_MIME + ";")
-    r = _run_quiet(["xdg-mime", "query", "default", LINUX_MIME])
-    if desktop and (r is None or r.stdout.strip() != LINUX_DESKTOP_ID + ".desktop"):
-        _run_quiet(["xdg-mime", "default", LINUX_DESKTOP_ID + ".desktop", LINUX_MIME])
+                                     parole="listino;prezzi;catalogo;pdf;stampa;", mime=LINUX_MIME)
+    if desktop:
+        tk_linux.rendi_predefinito(LINUX_DESKTOP_ID, LINUX_MIME)
     return desktop
 

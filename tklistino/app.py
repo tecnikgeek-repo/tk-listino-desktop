@@ -5,7 +5,7 @@ import sys
 import time
 
 from PySide6.QtCore import (
-    QBuffer, QIODevice, QMarginsF, QObject, QPointF, QRectF, QSize, QSizeF, Qt, QThread, QTimer, QUrl, Signal, Slot,
+    QBuffer, QIODevice, QMarginsF, QPointF, QRectF, QSize, QSizeF, Qt, QThread, QTimer, QUrl, Signal,
 )
 from PySide6.QtGui import (
     QBrush, QColor, QFont, QFontDatabase, QIcon, QImage, QKeySequence, QLinearGradient, QPageLayout, QPageSize, QPainter,
@@ -2303,23 +2303,11 @@ def cli_update_test(argv):
         return 1
 
 
-class _ApriConIlSistema(QObject):
-    """Linux: link, e-mail e cartelle si aprono con xdg-open e l'ambiente del sistema, non con quello del pacchetto
-    (con le nostre librerie il browser o il file manager potrebbero non partire)."""
-
-    @Slot(QUrl)
-    def apri(self, url):
-        from tklistino import tk_linux
-        tk_linux.apri(url.toLocalFile() if url.isLocalFile() else url.toString())
-
-
 def _linux_avvio(app):
-    from PySide6.QtGui import QDesktopServices
+    from tklistino.tk_linux_qt import instrada_link
     from tklistino.util import LINUX_DESKTOP_ID
     app.setDesktopFileName(LINUX_DESKTOP_ID)  # Wayland: la barra delle applicazioni trova l'icona dal .desktop
-    app._apri_sistema = _ApriConIlSistema(app)
-    for scheme in ("http", "https", "mailto", "file"):
-        QDesktopServices.setUrlHandler(scheme, app._apri_sistema, "apri")
+    instrada_link(app)  # link, e-mail e cartelle con l'ambiente del sistema, non con quello del pacchetto
 
 
 def runtime_check():
