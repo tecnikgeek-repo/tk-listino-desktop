@@ -15,8 +15,12 @@ def crea_licenza(versione):
     """La memoria del programma sta nella cartella dell'utente, non accanto al programma: tk-listino gira anche da pennetta."""
     try:
         from tklistino.tk_licenza import Licenza
-        base = (os.path.expanduser("~/Library/Application Support") if sys.platform == "darwin"
-                else os.environ.get("APPDATA") or os.path.expanduser("~"))
+        if sys.platform == "darwin":
+            base = os.path.expanduser("~/Library/Application Support")
+        elif sys.platform.startswith("linux"):
+            base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+        else:
+            base = os.environ.get("APPDATA") or os.path.expanduser("~")
         return Licenza("tk-listino", versione, os.path.join(base, "tk-listino"))
     except Exception:
         return None

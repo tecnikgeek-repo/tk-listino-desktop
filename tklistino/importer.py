@@ -1,4 +1,4 @@
-"""Importa un listino da foto o PDF: lettura del testo (OCR di Windows) e ricostruzione di righe e colonne."""
+"""Importa un listino da foto o PDF: lettura del testo (OCR di Windows o di macOS, Tesseract incluso su Linux) e ricostruzione di righe e colonne."""
 import os
 import re
 import statistics

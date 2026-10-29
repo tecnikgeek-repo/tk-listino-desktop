@@ -76,7 +76,7 @@ Salvataggio sicuro con copia di riserva e recupero automatico se il computer si 
 
 ## 🔒 I tuoi dati
 
-tk-listino lavora tutto sul tuo computer: anche l'import da foto e PDF avviene in locale (riconoscimento del testo di Windows o di macOS), niente viene caricato su internet.
+tk-listino lavora tutto sul tuo computer: anche l'import da foto e PDF avviene in locale (riconoscimento del testo di Windows o di macOS; su Linux è incluso nel programma), niente viene caricato su internet.
 
 | Resta sul tuo computer | Va in rete (e perché) |
 |---|---|
@@ -92,6 +92,7 @@ pubblicati dall'autore.
 
 - **Windows 10 / 11** — scarica l'installer `.exe` e avvialo. Non servono i permessi di amministratore.
 - **macOS** (Intel o Apple Silicon) — apri il `.dmg` e trascina l'app in *Applicazioni*. Al primo avvio: clic destro sull'app → *Apri*.
+- **Linux** (Ubuntu 22.04 o più recente, x86_64) — scarica il file `.AppImage`, rendilo eseguibile (*Proprietà* → *Esegui come programma*) e aprilo: si aggiunge da solo al menu delle applicazioni e apre i file `.listino` con un doppio clic.
 - **Portatile** — la versione ZIP gira anche da una chiavetta USB, senza installare niente.
 
 Gli aggiornamenti arrivano da soli: quando esce una versione nuova il programma te lo propone.
@@ -111,7 +112,7 @@ python -m venv .venv
 
 Su macOS: `.venv/bin/pip install -r requirements.txt pyobjc-framework-Vision`, poi `.venv/bin/python run.py`.
 
-Pacchetti: Windows con `installer\build.ps1` (ZIP portatile, ZIP di aggiornamento e installer), macOS con `mac/build_mac.sh`.
+Pacchetti: Windows con `installer\build.ps1` (ZIP portatile, ZIP di aggiornamento e installer), macOS con `mac/build_mac.sh`, Linux con `linux/build_linux.sh` (AppImage, Tesseract incluso).
 
 </details>
 

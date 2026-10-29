@@ -5,7 +5,7 @@ import sys
 import time
 
 from PySide6.QtCore import (
-    QBuffer, QIODevice, QMarginsF, QPointF, QRectF, QSize, QSizeF, Qt, QThread, QTimer, QUrl, Signal,
+    QBuffer, QIODevice, QMarginsF, QObject, QPointF, QRectF, QSize, QSizeF, Qt, QThread, QTimer, QUrl, Signal, Slot,
 )
 from PySide6.QtGui import (
     QBrush, QColor, QFont, QFontDatabase, QIcon, QImage, QKeySequence, QLinearGradient, QPageLayout, QPageSize, QPainter,
@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from tklistino import APP_TITLE, URL_SORGENTE, VERSION, model, pro, updater
 from tklistino.tk_licenza_qt import dentro_lo_schermo, testata_compatta
 from tklistino.util import (
-    APP_ROOT, IS_WIN, Settings, create_desktop_shortcut, data_dir, ensure_folder_shortcut, human_size, is_installed,
+    APP_ROOT, IS_LINUX, IS_WIN, Settings, create_desktop_shortcut, data_dir, ensure_folder_shortcut, human_size, is_installed,
     licenze_dir, migrate_old_names,
     log_dir, open_path,
 )
@@ -1341,10 +1341,21 @@ class MainWindow(QMainWindow):
             btn.setText(label if on else "")
 
     def ensure_file_assoc(self):
-        """Doppio clic su un .listino = tk-listino (non «Python»), con la nostra icona."""
+        """Doppio clic su un .listino = tk-listino (non «Python»), con la nostra icona. Su Linux anche la voce nel
+        menu delle applicazioni (tipo di file in ~/.local/share/mime, .desktop, xdg-mime)."""
         if IS_WIN:
             from tklistino import winreg_assoc
             winreg_assoc.ensure_registered()
+        elif IS_LINUX and is_installed() and "--selftest" not in sys.argv:
+            import threading
+            from tklistino.util import install_linux_integration
+
+            def work():
+                try:
+                    install_linux_integration()
+                except Exception:
+                    pass
+            threading.Thread(target=work, daemon=True).start()
 
     def ensure_shortcut(self):
         """Nella cartella del programma: collegamento «tk-listino» con la nostra icona (il .cmd non può averla).
@@ -2275,6 +2286,9 @@ def cli_update_test(argv):
             write("nessun aggiornamento")
             return 0
         asset = updater.asset_for(m)
+        if asset is None:
+            write("nessun file valido per questo sistema (manca o non è firmato): aggiornamento rifiutato")
+            return 1
         dest = os.path.join(updater.download_dir(), os.path.basename(asset["url"].split("?")[0]))
         updater.download(asset["url"], dest, asset.get("sha256"))
         write(f"scaricato e verificato: {dest}")
@@ -2287,6 +2301,46 @@ def cli_update_test(argv):
     except Exception as exc:
         write(f"ERRORE: {exc}")
         return 1
+
+
+class _ApriConIlSistema(QObject):
+    """Linux: link, e-mail e cartelle si aprono con xdg-open e l'ambiente del sistema, non con quello del pacchetto
+    (con le nostre librerie il browser o il file manager potrebbero non partire)."""
+
+    @Slot(QUrl)
+    def apri(self, url):
+        from tklistino import tk_linux
+        tk_linux.apri(url.toLocalFile() if url.isLocalFile() else url.toString())
+
+
+def _linux_avvio(app):
+    from PySide6.QtGui import QDesktopServices
+    from tklistino.util import LINUX_DESKTOP_ID
+    app.setDesktopFileName(LINUX_DESKTOP_ID)  # Wayland: la barra delle applicazioni trova l'icona dal .desktop
+    app._apri_sistema = _ApriConIlSistema(app)
+    for scheme in ("http", "https", "mailto", "file"):
+        QDesktopServices.setUrlHandler(scheme, app._apri_sistema, "apri")
+
+
+def runtime_check():
+    """Selftest del pacchetto: PDF da importare, licenze, stampa e OCR ci sono davvero. Ritorna «OK …» o solleva."""
+    import pypdfium2
+    from PySide6.QtPrintSupport import QPrinterInfo
+    from tklistino import ocr
+    lic = licenze_dir()
+    assert os.path.isfile(os.path.join(lic, "COPYING-AGPL-3.0.txt")), f"licenze mancanti ({lic})"
+    stampanti = len(QPrinterInfo.availablePrinterNames())
+    assert ocr.available(), "riconoscimento del testo non disponibile"
+    extra = ""
+    if IS_LINUX:
+        from tklistino import ocr_linux
+        extra = f" · {ocr_linux.versione()}"
+    pdf = pypdfium2.PdfDocument.new()
+    pdf.new_page(200, 200)
+    assert len(pdf) == 1, "PDFium non funziona"
+    pdf.close()
+    return (f"OK PDFium · {len(os.listdir(lic))} licenze · "
+            f"{stampanti} stampanti · OCR{extra}")
 
 
 def load_fonts():
@@ -2304,6 +2358,24 @@ def load_fonts():
 
 def main():
     argv = sys.argv[1:]
+    if "--selftest" in argv:
+        import tempfile
+        os.environ.setdefault("TKLISTINO_DATI", tempfile.mkdtemp(prefix="tklistino-selftest-"))
+    if "--ocr-test" in argv:
+        # verifica del pacchetto: righe riconosciute, poi «---» e le parole con il riquadro (tests/verifica_ocr.py)
+        i = argv.index("--ocr-test")
+        from PySide6.QtGui import QImage
+        from tklistino import ocr
+        try:
+            lines = ocr.recognize([QImage(argv[i + 1])])[0]
+            text = "\n".join(" ".join(t for t, _ in words) for words in lines)
+            text += "\n---\n" + "\n".join(f"{t}\t{r.x():.1f}\t{r.y():.1f}\t{r.width():.1f}\t{r.height():.1f}"
+                                          for words in lines for t, r in words)
+        except Exception as exc:
+            text = f"ERRORE: {exc}"
+        with open(argv[i + 2], "w", encoding="utf-8") as fh:
+            fh.write(text)
+        sys.exit(0 if text and not text.startswith("ERRORE") else 1)
     if "--import-test" in argv:
         from PySide6.QtGui import QGuiApplication
         _qapp = QGuiApplication(sys.argv)
@@ -2328,6 +2400,8 @@ def main():
     app.licenza = pro.crea_licenza(VERSION)
     app.setApplicationName(APP_TITLE)
     app.setStyle("Fusion")
+    if IS_LINUX:
+        _linux_avvio(app)
     import PySide6
     from PySide6.QtCore import QLibraryInfo, QTranslator
     tr = QTranslator(app)
@@ -2350,6 +2424,12 @@ def main():
     files = [a for a in argv if a.lower().endswith(".listino") and os.path.isfile(a)]
     if "--selftest" in argv:
         out = argv[argv.index("--selftest") + 1]
+        try:
+            res = runtime_check()
+        except Exception as exc:
+            res = f"ERRORE {exc.__class__.__name__}: {exc}"
+        with open(os.path.splitext(out)[0] + ".txt", "w", encoding="utf-8") as fh:
+            fh.write(res)
         win.load_document(model.sample_document(), "")
         win.resize(1400, 1300)
         win.show()

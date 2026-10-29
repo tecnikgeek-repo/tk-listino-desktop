@@ -1,8 +1,9 @@
 """Prepara la cartella «licenze» del pacchetto: AGPL di tk-listino, testi delle licenze dei componenti inclusi
 DAVVERO nel pacchetto (copiati da licenze/ e dai *.dist-info dei pacchetti) e COMPONENTI.txt con le versioni.
 
-Uso (lo chiamano installer/build.ps1 e mac/build_mac.sh):
-    python tools_licenze.py <cartella di uscita> <site-packages> [--mac]
+Uso (lo chiamano installer/build.ps1, mac/build_mac.sh e linux/build_linux.sh):
+    python tools_licenze.py <cartella di uscita> <site-packages> [--mac | --linux]
+Con --linux aggiunge Tesseract e le sue librerie (build/tesseract/licenze) e libxcb-cursor (build/xcb-cursor).
 """
 import glob
 import os
@@ -49,6 +50,7 @@ def copia_dist_info(dist, uscita, prefisso):
 def main():
     uscita, sp = sys.argv[1], sys.argv[2]
     mac = "--mac" in sys.argv
+    linux = "--linux" in sys.argv
     if os.path.isdir(uscita):
         shutil.rmtree(uscita)
     os.makedirs(uscita)
@@ -57,6 +59,8 @@ def main():
              "BSD-3-Clause.txt", "OFL-1.1.txt", "Python-PSF.txt"]
     if mac:
         testi += ["MIT.txt", "GPL-2.0.txt"]  # pyobjc (MIT); PyInstaller (GPL-2.0 con eccezione per il bootloader)
+    if linux:
+        testi += ["MIT.txt", "GPL-2.0.txt"]  # runtime AppImage e libxcb-cursor (MIT); PyInstaller (GPL-2.0 + eccezione)
     for t in testi:
         shutil.copyfile(os.path.join(TESTI, t), os.path.join(uscita, t))
 
@@ -77,7 +81,7 @@ def main():
         pass
 
     righe = [
-        f"tk-listino {VERSION} — componenti inclusi nel pacchetto ({'macOS' if mac else 'Windows'})",
+        f"tk-listino {VERSION} — componenti inclusi nel pacchetto ({'macOS' if mac else 'Linux' if linux else 'Windows'})",
         "=" * 72,
         "",
         f"tk-listino {VERSION}",
@@ -126,13 +130,45 @@ def main():
             "  Sorgente: https://github.com/ronaldoussoren/pyobjc",
             "",
         ]
+    elif linux:
+        v_pyi, d_pyi = versione(sp, "pyinstaller")
+        copia_dist_info(d_pyi, uscita, "pyinstaller")
+        tess = os.path.join(ROOT, "build", "tesseract", "licenze", "Tesseract-OCR-e-librerie.txt")
+        if os.path.isfile(tess):
+            shutil.copyfile(tess, os.path.join(uscita, "Tesseract-OCR-e-librerie.txt"))
+        xcb = os.path.join(ROOT, "build", "xcb-cursor", "copyright")
+        if os.path.isfile(xcb):
+            shutil.copyfile(xcb, os.path.join(uscita, "libxcb-cursor-LICENSE.txt"))
+        righe += [
+            f"PyInstaller {v_pyi} (avvio del programma nel file AppImage)",
+            "  Licenza: GPL-2.0 con eccezione per il bootloader (GPL-2.0.txt, pyinstaller-*.txt)",
+            "  Sorgente: https://github.com/pyinstaller/pyinstaller",
+            "",
+            "Tesseract OCR (riconoscimento del testo delle foto, con i dati per italiano e inglese)",
+            "  Licenza: Apache-2.0 (Apache-2.0.txt), © Google e i contributori di Tesseract.",
+            "  Sorgente: https://github.com/tesseract-ocr/tesseract · https://github.com/tesseract-ocr/tessdata",
+            "  Il programma e le librerie che usa (Leptonica, libarchive, libjpeg-turbo, libpng, libtiff, libwebp,",
+            "  giflib, OpenJPEG, libgomp e le altre) sono presi dai pacchetti di Ubuntu senza modifiche: elenco dei",
+            "  file, versioni e file copyright originali di ogni pacchetto in Tesseract-OCR-e-librerie.txt.",
+            "",
+            "libxcb-cursor (serve a Qt sotto X11)",
+            "  Licenza: MIT/X11 (libxcb-cursor-LICENSE.txt)",
+            "  Sorgente: https://gitlab.freedesktop.org/xorg/lib/libxcb-cursor",
+            "",
+            "Runtime AppImage (avvio del file AppImage)",
+            "  Licenza: MIT (MIT.txt). Sorgente: https://github.com/AppImage/type2-runtime",
+            "",
+            "Le librerie Qt e PySide6 sono dentro il file AppImage: si estraggono con",
+            "«tk-listino-….AppImage --appimage-extract» (cartella usr/lib/tk-listino/_internal).",
+            "",
+        ]
     else:
         righe += [
             "Microsoft Visual C++ Runtime (msvcp140, vcruntime140, concrt140: arrivano con PySide6)",
             "  Licenza: file ridistribuibili di Microsoft Visual Studio",
             "",
         ]
-    with open(os.path.join(uscita, "COMPONENTI.txt"), "w", encoding="utf-8", newline="\r\n" if not mac else "\n") as fh:
+    with open(os.path.join(uscita, "COMPONENTI.txt"), "w", encoding="utf-8", newline="\r\n" if not (mac or linux) else "\n") as fh:
         fh.write("\n".join(righe))
     print(f"licenze: {len(os.listdir(uscita))} file ({len(extra)} da pypdfium2)")
 

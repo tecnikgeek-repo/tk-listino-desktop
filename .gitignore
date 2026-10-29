@@ -8,6 +8,7 @@ assets/*.iconset/
 assets/*.icns
 tests/*.png
 !tests/prova.png
+!tests/ocr-it.png
 tests/*.txt
 tests/*.pdf
 !tests/prova.pdf

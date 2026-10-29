@@ -1,8 +1,8 @@
-﻿# Pubblica una versione di tk-listino per Windows e Mac: gli utenti la ricevono con l'aggiornamento automatico.
+﻿# Pubblica una versione di tk-listino per Windows, Mac e Linux: gli utenti la ricevono con l'aggiornamento automatico.
 # Uso:  powershell -ExecutionPolicy Bypass -File release\publish.ps1 -Notes "Novità 1|Novità 2"
-# Prima: VERSION alzata in tklistino\__init__.py e commit fatto (lo script fa push e attende la build Mac su GitHub).
-# -SoloWindows: pubblica solo Windows (manifest senza chiavi mac) quando la build Mac su GitHub non può partire
-#   (quota Actions finita); i Mac restano sull'ultima versione Mac, la cartella Mac\ di Dropbox non si tocca.
+# Prima: VERSION alzata in tklistino\__init__.py e commit fatto (lo script fa push e attende le build Mac e Linux su GitHub).
+# -SoloWindows: pubblica solo Windows (manifest senza chiavi mac/linux) quando le build su GitHub non possono partire
+#   (quota Actions finita); Mac e Linux restano sull'ultima versione, le cartelle Mac\ e Linux\ di Dropbox non si toccano.
 param(
     [Parameter(Mandatory = $true)][string]$Notes,
     [switch]$SoloWindows
@@ -18,7 +18,7 @@ $sshConfig = "$env:USERPROFILE\Dropbox\CLAUDE\fleet\ssh-config"
 $remoteDir = 'public_html/updates/tk-listino'
 $baseUrl = 'https://pietrodefilippis.it/updates/tk-listino'
 $dropbox = "$env:USERPROFILE\Dropbox\CLAUDE\tk-software\tk-listino"
-Write-Host "== Pubblicazione tk-listino $version (Windows + Mac)"
+Write-Host "== Pubblicazione tk-listino $version (Windows + Mac + Linux)"
 
 # --- la versione non deve essere già pubblicata
 try {
@@ -41,7 +41,7 @@ $setupWin = "dist\tk-listino-setup-$version.exe"
 if (-not (Test-Path $setupWin)) { throw "Manca l'installazione ${setupWin}: rifai installer\build.ps1" }
 $assets += @{ key = 'windows'; file = (Resolve-Path $setupWin).Path }
 
-# --- Mac: build su GitHub del commit corrente, dmg presi dalla release v<versione>
+# --- Mac e Linux: build su GitHub del commit corrente, dmg e AppImage presi dalla release v<versione>
 if (git status --porcelain --untracked-files=no) { throw 'Ci sono modifiche non committate: fai commit prima di pubblicare' }
 git push -q
 if ($LASTEXITCODE -ne 0) { throw 'git push non riuscito' }
@@ -54,20 +54,28 @@ if ($LASTEXITCODE -ne 0) {
 git push -q origin "v$version"
 if ($LASTEXITCODE -ne 0) { throw "git push del tag v$version non riuscito" }
 if (-not $SoloWindows) {
-# la build Mac non parte più da sola a ogni push: la avvio io sul commit appena inviato
-gh workflow run build-mac.yml --repo tecnikgeek-repo/tk-listino-desktop --ref main
-if ($LASTEXITCODE -ne 0) { throw 'Avvio della build macOS su GitHub non riuscito' }
-Start-Sleep -Seconds 5
+# le build Mac e Linux non partono più da sole a ogni push: le avvio io, in parallelo, sul commit appena inviato
 $sha = (git rev-parse HEAD).Trim()
-Write-Host "   attendo la build macOS del commit $($sha.Substring(0,7))…"
-$runId = $null
-for ($i = 0; $i -lt 30 -and -not $runId; $i++) {
-    $runId = gh run list --repo $repo --workflow build-mac.yml --commit $sha --json databaseId --jq '.[0].databaseId'
-    if (-not $runId) { Start-Sleep -Seconds 5 }
+foreach ($wf in 'build-mac.yml', 'build-linux.yml') {
+    gh workflow run $wf --repo $repo --ref main
+    if ($LASTEXITCODE -ne 0) { throw "Avvio di $wf su GitHub non riuscito" }
 }
-if (-not $runId) { throw 'Build macOS non trovata su GitHub' }
-gh run watch $runId --repo $repo --exit-status | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Build macOS fallita: https://github.com/$repo/actions/runs/$runId" }
+Start-Sleep -Seconds 5
+$runs = @{}
+foreach ($wf in 'build-mac.yml', 'build-linux.yml') {
+    $runId = $null
+    for ($i = 0; $i -lt 30 -and -not $runId; $i++) {
+        $runId = gh run list --repo $repo --workflow $wf --commit $sha --json databaseId --jq '.[0].databaseId'
+        if (-not $runId) { Start-Sleep -Seconds 5 }
+    }
+    if (-not $runId) { throw "$wf non trovata su GitHub" }
+    $runs[$wf] = $runId
+}
+Write-Host "   attendo le build macOS e Linux del commit $($sha.Substring(0,7))…"
+foreach ($wf in $runs.Keys) {
+    gh run watch $runs[$wf] --repo $repo --exit-status | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "$wf fallita: https://github.com/$repo/actions/runs/$($runs[$wf])" }
+}
 $macDir = "dist\mac-$version"
 if (Test-Path $macDir) { Remove-Item -LiteralPath $macDir -Recurse -Force }
 New-Item -ItemType Directory -Force $macDir | Out-Null
@@ -78,6 +86,11 @@ foreach ($arch in 'arm64', 'x86_64') {
     if (-not (Test-Path $dmg)) { throw "Manca il dmg $arch" }
     $assets += @{ key = "mac-$arch"; file = (Resolve-Path $dmg).Path }
 }
+gh release download "v$version" --repo $repo --dir $macDir --pattern '*.AppImage' --clobber
+if ($LASTEXITCODE -ne 0) { throw "Download dell'AppImage dalla release v$version fallito" }
+$appImage = Join-Path $macDir "tk-listino-$version-linux-x86_64.AppImage"
+if (-not (Test-Path $appImage)) { throw "Manca l'AppImage Linux" }
+$assets += @{ key = 'linux-x86_64'; file = (Resolve-Path $appImage).Path }
 }
 
 # --- manifest
@@ -123,16 +136,17 @@ foreach ($a in $assets) {
 }
 Write-Host "   manifest e file online verificati"
 
-# --- cartella Dropbox: Windows (ZIP portatile) e Mac (dmg), solo l'ultima versione
-New-Item -ItemType Directory -Force "$dropbox\Windows", "$dropbox\Mac" | Out-Null
+# --- cartella Dropbox: Windows (ZIP portatile), Mac (dmg) e Linux (AppImage), solo l'ultima versione
+New-Item -ItemType Directory -Force "$dropbox\Windows", "$dropbox\Mac", "$dropbox\Linux" | Out-Null
 Get-ChildItem $dropbox -File -Filter 'tk-listino-*' | Remove-Item -Force
-$clean = if ($SoloWindows) { @("$dropbox\Windows") } else { @("$dropbox\Windows", "$dropbox\Mac") }
+$clean = if ($SoloWindows) { @("$dropbox\Windows") } else { @("$dropbox\Windows", "$dropbox\Mac", "$dropbox\Linux") }
 Get-ChildItem $clean -File | Where-Object { $_.Name -notlike "*$version*" } | Remove-Item -Force
 Copy-Item $winPortable "$dropbox\Windows\" -Force
 $setupExe = "dist\tk-listino-setup-$version.exe"
 if (Test-Path $setupExe) { Copy-Item $setupExe "$dropbox\Windows\" -Force }
 foreach ($a in $assets | Where-Object { $_.key -like 'mac-*' }) { Copy-Item $a.file "$dropbox\Mac\" -Force }
-& robocopy $root "$dropbox\progetto" /MIR /NFL /NDL /NJH /NJS /NP /XD .venv .venv-mac build dist __pycache__ .git Listini /XF *.pyc | Out-Null
+foreach ($a in $assets | Where-Object { $_.key -like 'linux-*' }) { Copy-Item $a.file "$dropbox\Linux\" -Force }
+& robocopy $root "$dropbox\progetto" /MIR /NFL /NDL /NJH /NJS /NP /XD .venv .venv-mac .venv-linux build dist __pycache__ .git Listini licenze-pacchetto /XF *.pyc | Out-Null
 
-if ($SoloWindows) { Write-Host "== tk-listino $version pubblicato SOLO per Windows (Mac in sospeso)." }
-else { Write-Host "== tk-listino $version pubblicato per Windows e Mac." }
+if ($SoloWindows) { Write-Host "== tk-listino $version pubblicato SOLO per Windows (Mac e Linux in sospeso)." }
+else { Write-Host "== tk-listino $version pubblicato per Windows, Mac e Linux." }

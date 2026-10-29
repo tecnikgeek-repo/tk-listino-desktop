@@ -7,6 +7,12 @@ from tklistino import APP_NAME
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IS_MAC = sys.platform == "darwin"
 IS_WIN = sys.platform == "win32"
+IS_LINUX = sys.platform.startswith("linux")
+
+from tklistino import tk_linux  # noqa: E402  (libreria comune dei software TK)
+
+LINUX_DESKTOP_ID = "tk-listino"  # nome del file .desktop = app_id della finestra su Wayland (icona nella barra)
+LINUX_MIME = "application/x-tk-listino"  # file .listino (tipo registrato in ~/.local/share/mime)
 
 
 def mac_bundle_path():
@@ -18,9 +24,12 @@ def mac_bundle_path():
 
 
 def is_installed():
-    """True se gira dal pacchetto portatile (Windows: cartella «app» con il Python incluso; Mac: bundle .app)."""
+    """True se gira dal pacchetto portatile (Windows: cartella «app» con il Python incluso; Mac: bundle .app;
+    Linux: file AppImage)."""
     if IS_MAC:
         return bool(getattr(sys, "frozen", False) and mac_bundle_path())
+    if IS_LINUX:
+        return bool(tk_linux.appimage_path())
     bundled = os.path.join(APP_ROOT, "python")
     return os.path.isfile(os.path.join(bundled, "pythonw.exe")) and         os.path.normcase(os.path.abspath(sys.base_prefix)) == os.path.normcase(bundled)
 
@@ -38,7 +47,21 @@ def _writable_dir(path):
 
 def data_dir():
     """Cartella dei listini. Windows: «Listini» accanto a «app» (sulla pennetta). Mac: accanto al .app se sta su un
-    disco esterno scrivibile (pennetta), altrimenti Documenti/tk-listino/Listini. Gli aggiornamenti non la toccano."""
+    disco esterno scrivibile (pennetta), altrimenti Documenti/tk-listino/Listini. Linux: accanto all'AppImage se sta
+    su un disco esterno scrivibile (/media, /run/media), altrimenti ~/.local/share/tk-listino/Listini.
+    Gli aggiornamenti non la toccano."""
+    if os.environ.get("TKLISTINO_DATI"):  # collaudi
+        path = os.environ["TKLISTINO_DATI"]
+        os.makedirs(path, exist_ok=True)
+        return path
+    if IS_LINUX:
+        appimage = tk_linux.appimage_path()
+        parent = os.path.dirname(appimage) if appimage else ""
+        if parent.startswith(("/media/", "/run/media/")) and _writable_dir(os.path.join(parent, "Listini")):
+            return os.path.join(parent, "Listini")
+        path = os.path.join(tk_linux.cartella_dati("tk-listino"), "Listini")
+        os.makedirs(path, exist_ok=True)
+        return path
     if IS_MAC and is_installed():
         parent = os.path.dirname(mac_bundle_path())
         if parent.startswith("/Volumes/") and _writable_dir(os.path.join(parent, "Listini")):
@@ -54,7 +77,13 @@ def data_dir():
 
 
 def log_dir():
-    """Dove scrivere i log (su Mac non dentro Documenti)."""
+    """Dove scrivere i log (su Mac non dentro Documenti; su Linux in ~/.local/share/tk-listino)."""
+    if os.environ.get("TKLISTINO_DATI"):
+        return data_dir()
+    if IS_LINUX:
+        path = tk_linux.cartella_dati("tk-listino")
+        os.makedirs(path, exist_ok=True)
+        return path
     if IS_MAC:
         path = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "tk-listino")
         os.makedirs(path, exist_ok=True)
@@ -70,7 +99,7 @@ def open_path(path):
     elif IS_MAC:
         subprocess.Popen(["open", path])
     else:
-        subprocess.Popen(["xdg-open", path])
+        tk_linux.apri(path)
 
 
 def human_size(n):
@@ -250,3 +279,60 @@ def migrate_old_names():
                 os.remove(old_cmd)
     except OSError:
         pass
+
+
+# ------------------------------------------------------------------ Linux
+MIME_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-tk-listino">
+    <comment>Listino tk-listino</comment>
+    <sub-class-of type="application/json"/>
+    <icon name="application-x-tk-listino"/>
+    <glob pattern="*.listino"/>
+  </mime-type>
+</mime-info>
+"""
+
+
+def _run_quiet(cmd):
+    import subprocess
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=tk_linux.system_env())
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def install_linux_integration():
+    """Linux (AppImage): tipo di file .listino con la sua icona (~/.local/share/mime), voce «tk-listino» nel menu
+    delle applicazioni e doppio clic sui .listino = tk-listino. Si corregge da sola se l'AppImage è stato spostato.
+    Ritorna il percorso del .desktop o "" (non gira dal pacchetto)."""
+    if not tk_linux.appimage_path():
+        return ""
+    import shutil
+    base = tk_linux.xdg_data_home()
+    icon = os.path.join(getattr(sys, "_MEIPASS", APP_ROOT), "assets", "tk-listino-512.png")
+    mime_dir = os.path.join(base, "mime")
+    xml = os.path.join(mime_dir, "packages", "tk-listino.xml")
+    try:
+        with open(xml, encoding="utf-8") as fh:
+            uguale = fh.read() == MIME_XML
+    except OSError:
+        uguale = False
+    if not uguale:
+        os.makedirs(os.path.dirname(xml), exist_ok=True)
+        with open(xml + ".tmp", "w", encoding="utf-8") as fh:
+            fh.write(MIME_XML)
+        os.replace(xml + ".tmp", xml)
+        _run_quiet(["update-mime-database", mime_dir])
+    mime_icons = os.path.join(base, "icons", "hicolor", "512x512", "mimetypes")
+    if os.path.isfile(icon) and not os.path.isfile(os.path.join(mime_icons, "application-x-tk-listino.png")):
+        os.makedirs(mime_icons, exist_ok=True)
+        shutil.copyfile(icon, os.path.join(mime_icons, "application-x-tk-listino.png"))
+    desktop = tk_linux.installa_menu(LINUX_DESKTOP_ID, "tk-listino", "Listini con foto, sezioni e prezzi, in PDF o "
+                                     "stampati (TecnikGeek)", "Office;", icon, nome_generico="Listini prezzi",
+                                     parole="listino;prezzi;catalogo;pdf;stampa;", mime=LINUX_MIME + ";")
+    r = _run_quiet(["xdg-mime", "query", "default", LINUX_MIME])
+    if desktop and (r is None or r.stdout.strip() != LINUX_DESKTOP_ID + ".desktop"):
+        _run_quiet(["xdg-mime", "default", LINUX_DESKTOP_ID + ".desktop", LINUX_MIME])
+    return desktop
+
