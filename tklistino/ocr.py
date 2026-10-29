@@ -110,7 +110,8 @@ def recognize(images):
         raw = [_recognize_mac(p[0]) for p in prepared]
     elif sys.platform.startswith("linux"):
         from tklistino import ocr_linux
-        raw = ocr_linux.riconosci([p[0] for p in prepared])
+        # testo sparso (psm 11): ogni cella del listino a sé, anche due prezzi uno sotto l'altro
+        raw = ocr_linux.riconosci([p[0] for p in prepared], psm=11)
     else:
         raise RuntimeError("Riconoscimento del testo non disponibile su questo sistema")
     out = []
