@@ -63,7 +63,10 @@ Copy-Item 'run.py' $stage
 $cmdText = (Get-Content "$PSScriptRoot\Avvia tk-listino.cmd" -Raw) -replace "`r?`n", "`r`n"
 [IO.File]::WriteAllText("$stage\assets\avvia.cmd", $cmdText, [Text.Encoding]::ASCII)
 # testi delle licenze (AGPL + componenti inclusi, dai *.dist-info) e COMPONENTI.txt, accanto a run.py
-& "$venv\Scripts\python.exe" -I "$root\tools_licenze.py" "$stage\licenze" $sp
+# Python di base + librerie del venv: Smart App Control blocca .venv\Scripts\python.exe (lanciatore non firmato)
+$env:PYTHONPATH = (Join-Path $venv 'Lib\site-packages')
+& "$pyHome\python.exe" "$root\tools_licenze.py" "$stage\licenze" $sp
+Remove-Item Env:PYTHONPATH
 if ($LASTEXITCODE -ne 0) { throw 'Preparazione delle licenze fallita' }
 if (Test-Path "$pyHome\LICENSE.txt") { Copy-Item "$pyHome\LICENSE.txt" "$stage\licenze\Python-LICENSE.txt" }
 & "$py\python.exe" -m compileall -q "$py\Lib" 2>$null | Out-Null
