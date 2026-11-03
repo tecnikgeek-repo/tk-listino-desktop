@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from tklistino.tk_licenza_qt import dentro_lo_schermo
 from tklistino import APP_TITLE
 from tklistino.app import tk_warn
 
@@ -75,7 +76,7 @@ class PrintDialog(QDialog):
         super().__init__(win)
         self.win = win
         self.setWindowTitle("Stampa listino")
-        self.resize(1040, 760)
+        dentro_lo_schermo(self, 1040, 760)
         self.sheet = 0
         self.preview_doc = None
         root = QHBoxLayout(self)
