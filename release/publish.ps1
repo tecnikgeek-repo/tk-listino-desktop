@@ -56,7 +56,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 git push -q origin "v$version"
 if ($LASTEXITCODE -ne 0) { throw "git push del tag v$version non riuscito" }
+}
 if (-not $SoloWindows) {
+if (-not $SenzaGitHub) {
 # le build Mac e Linux non partono più da sole a ogni push: le avvio io, in parallelo, sul commit appena inviato
 $sha = (git rev-parse HEAD).Trim()
 foreach ($wf in 'build-mac.yml', 'build-linux.yml') {
