@@ -1,4 +1,5 @@
 """Finestra principale di tk-listino: editor a lastre a sinistra, foglio A4 reale a destra."""
+from tklistino.errori import frase_errore, motivo_errore
 import base64
 import os
 import sys
@@ -693,7 +694,7 @@ class ImportThread(QThread):
             from tklistino import importer
             self.done.emit(importer.import_file(self.path, self.status.emit))
         except Exception as exc:
-            self.failed.emit(str(exc))
+            self.failed.emit(motivo_errore(exc))
 
 
 class CheckThread(QThread):
@@ -703,7 +704,7 @@ class CheckThread(QThread):
         try:
             self.checked.emit(updater.fetch_manifest(), "")
         except Exception as exc:
-            self.checked.emit(None, str(exc))
+            self.checked.emit(None, motivo_errore(exc))
 
 
 class DownloadThread(QThread):
@@ -727,7 +728,7 @@ class DownloadThread(QThread):
         except InterruptedError:
             self.failed.emit("")
         except Exception as exc:
-            self.failed.emit(str(exc))
+            self.failed.emit(motivo_errore(exc))
 
 
 class TkDialog(QDialog):
@@ -1045,7 +1046,7 @@ class MainWindow(QMainWindow):
         try:
             doc = model.load(info["file"])
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Non riesco a leggere la copia di recupero:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Non riesco a leggere la copia di recupero.", exc))
             return False
         self.load_document(doc, orig if orig and os.path.isdir(os.path.dirname(orig)) else "")
         self.dirty = True
@@ -1638,7 +1639,7 @@ class MainWindow(QMainWindow):
         try:
             self.block()["logo"] = shrink_logo(path)
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Non riesco a leggere l'immagine:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Non riesco a leggere l'immagine.", exc))
             return
         self.fill_block()
         self.touch()
@@ -1845,7 +1846,7 @@ class MainWindow(QMainWindow):
         try:
             data = shrink_logo(path, 240)
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Non riesco a leggere l'immagine:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Non riesco a leggere l'immagine.", exc))
             return
         imgs = model.row_images(s)
         imgs[i] = data
@@ -1908,7 +1909,7 @@ class MainWindow(QMainWindow):
                 try:
                     os.replace(self.path, new)
                 except OSError as exc:
-                    tk_warn(self, APP_TITLE, f"Non riesco a rinominare il file:\n{exc}")
+                    tk_warn(self, APP_TITLE, frase_errore("Non riesco a rinominare il file.", exc))
                     return
                 self.path = new
         self.doc["name"] = name
@@ -1979,7 +1980,7 @@ class MainWindow(QMainWindow):
         try:
             self.load_document(model.load(path), path)
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Non riesco ad aprire il listino:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Non riesco ad aprire il listino.", exc))
 
     def act_save(self):
         if not self.path:
@@ -2000,7 +2001,7 @@ class MainWindow(QMainWindow):
         try:
             model.save(path, self.doc)
         except OSError as exc:
-            tk_warn(self, APP_TITLE, f"Salvataggio non riuscito:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Salvataggio non riuscito.", exc))
             return False
         self.path = path
         self.dirty = False
@@ -2128,7 +2129,7 @@ class MainWindow(QMainWindow):
         try:
             self.write_pdf(path)
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Creazione del PDF non riuscita:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Creazione del PDF non riuscita.", exc))
             return
         self.settings.setValue("last_pdf_dir", os.path.dirname(path))
         self.statusBar().showMessage(f"PDF creato: {path}", 8000)
@@ -2166,7 +2167,7 @@ class MainWindow(QMainWindow):
         try:
             path = create_desktop_shortcut()
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Non riesco a creare l'icona sul Desktop:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Non riesco a creare l'icona sul Desktop.", exc))
             return
         tk_info(self, APP_TITLE, f"Icona creata sul Desktop:\n{path}")
 
@@ -2248,7 +2249,7 @@ class MainWindow(QMainWindow):
                 updater.apply_update(path, new_version=str(self.manifest["version"]))
             except Exception as exc:
                 prog.close()
-                tk_warn(self, APP_TITLE, f"Aggiornamento non riuscito:\n{exc}")
+                tk_warn(self, APP_TITLE, frase_errore("Aggiornamento non riuscito.", exc))
                 return
             self.closing_for_update = True
             QTimer.singleShot(300, QApplication.instance().quit)

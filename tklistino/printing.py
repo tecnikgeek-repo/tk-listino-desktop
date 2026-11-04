@@ -2,6 +2,7 @@
 
 Su Windows 11 la finestra di sistema si intitola «Python - Stampa» (nome dell'eseguibile) e non ha
 anteprima: qui si sceglie tutto dentro l'app e si stampa direttamente con QPrinter."""
+from tklistino.errori import frase_errore
 import subprocess
 import sys
 
@@ -242,7 +243,7 @@ class PrintDialog(QDialog):
         try:
             self.win.build_print_doc(pr).print_(pr)
         except Exception as exc:
-            tk_warn(self, APP_TITLE, f"Impossibile stampare:\n{exc}")
+            tk_warn(self, APP_TITLE, frase_errore("Impossibile stampare.", exc))
             return
         super().accept()
 
